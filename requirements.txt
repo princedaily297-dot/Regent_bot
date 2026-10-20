@@ -1,3 +1,5 @@
 pyTelegramBotAPI
 staypresent[prod]
 yt-dlp
+requests
+feedparser
