@@ -35,7 +35,6 @@ def send_id(message):
 
 @bot.message_handler(commands=['checkdevice'])
 def check_device(message):
-    # Telegram hides exact device models, but we can check OS via language or flags
     user = message.from_user
     is_premium = "Yes (Premium User)" if user.is_premium else "No (Free User)"
     bot.reply_to(message, f"📱 **Device Info:**\nUser ID: {user.id}\nName: {user.first_name}\nTelegram Premium: {is_premium}\nLanguage: {user.language_code}")
@@ -47,29 +46,30 @@ def play_music(message):
         bot.reply_to(message, "Please provide a song name. Example:\n`/play Shape of You`", parse_mode="Markdown")
         return
     
-    msg = bot.reply_to(message, f"🔍 Searching and downloading: **{query}**...", parse_mode="Markdown")
+    msg = bot.reply_to(message, f"🔍 Searching and downloading: **{query}** from SoundCloud...", parse_mode="Markdown")
     
-    # Configure YouTube downloader
+    # Configure yt-dlp for SoundCloud
     ydl_opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio',
+        'format': 'bestaudio/best',
         'outtmpl': 'song.%(ext)s',
         'noplaylist': True,
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Search YouTube and get the first result
-            info = ydl.extract_info(f"ytsearch1:{query}", download=True)['entries'][0]
+            # Search SoundCloud instead of YouTube
+            info = ydl.extract_info(f"scsearch1:{query}", download=True)['entries'][0]
             filename = ydl.prepare_filename(info)
             
         with open(filename, 'rb') as audio:
-            bot.send_audio(message.chat.id, audio, title=info['title'], performer="YouTube")
+            bot.send_audio(message.chat.id, audio, title=info['title'], performer=info.get('uploader', 'SoundCloud'))
             
-        os.remove(filename) # Delete the file after sending to save space
-        bot.delete_message(message.chat.id, msg.message_id) # Delete the "Searching" message
+        os.remove(filename) # Clean up the file to save space
+        bot.delete_message(message.chat.id, msg.message_id) # Remove the "Searching" message
         
     except Exception as e:
-        bot.edit_message_text(f"❌ Failed to download. YouTube might be blocking the server.", message.chat.id, msg.message_id)
+        # If it fails, show the actual error
+        bot.edit_message_text(f"❌ Failed to download from SoundCloud.\nError: {str(e)[:200]}", message.chat.id, msg.message_id)
 
 @bot.message_handler(commands=['balance'])
 def check_balance(message):
@@ -84,7 +84,8 @@ def start_trivia(message):
     questions = [
         {"q": "What is the capital of France?", "a": "Paris", "options": ["London", "Berlin", "Paris", "Madrid"]},
         {"q": "Which planet is known as the Red Planet?", "a": "Mars", "options": ["Earth", "Mars", "Jupiter", "Venus"]},
-        {"q": "Who painted the Mona Lisa?", "a": "Leonardo da Vinci", "options": ["Van Gogh", "Picasso", "Da Vinci", "Michelangelo"]}
+        {"q": "Who painted the Mona Lisa?", "a": "Leonardo da Vinci", "options": ["Van Gogh", "Picasso", "Da Vinci", "Michelangelo"]},
+        {"q": "What is the largest ocean on Earth?", "a": "Pacific", "options": ["Atlantic", "Indian", "Arctic", "Pacific"]}
     ]
     
     q = random.choice(questions)
@@ -101,14 +102,17 @@ def start_trivia(message):
 def handle_query(call):
     # Handle Trivia Answers
     if call.data.startswith("trivia_"):
-        _, chosen, correct = call.data.split("_")
-        if chosen == correct:
-            bot.answer_callback_query(call.id, "✅ Correct! You win $50!")
-            # Add balance
-            user_id = call.from_user.id
-            user_balances[user_id] = user_balances.get(user_id, 1000) + 50
-        else:
-            bot.answer_callback_query(call.id, f"❌ Wrong! The answer was {correct}.", show_alert=True)
+        try:
+            _, chosen, correct = call.data.split("_")
+            if chosen == correct:
+                bot.answer_callback_query(call.id, "✅ Correct! You win $50!")
+                # Add balance
+                user_id = call.from_user.id
+                user_balances[user_id] = user_balances.get(user_id, 1000) + 50
+            else:
+                bot.answer_callback_query(call.id, f"❌ Wrong! The answer was {correct}.", show_alert=True)
+        except ValueError:
+            pass
         return
 
     # Handle Main Menu Buttons
