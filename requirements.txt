@@ -1,2 +1,3 @@
 pyTelegramBotAPI
 staypresent[prod]
+yt-dlp
